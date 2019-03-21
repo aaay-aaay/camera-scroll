@@ -19,8 +19,40 @@ namespace CameraScroll
             On.RoomCamera.PreLoadTexture += PreLoadTextureHook;
         }
         
+        public static bool ShouldScroll(RoomCamera rCam)
+        {
+            return ShouldScroll(rCam.room);
+        }
+        
+        public static bool ShouldScroll(Room room)
+        {
+            if (room == null) return true;
+            bool should;
+            string name = room.abstractRoom.name;
+            if (shouldScrollRooms.TryGetValue(name, out should))
+            {
+                return should;
+            }
+            // If the code reaches this point, no camera scroll code has touched the room.
+            if (room.cameraPositions.Length == 1)
+            {
+                should = false;
+            }
+            else
+            {
+                should = true;
+            }
+            shouldScrollRooms[name] = should;
+            return should;
+        }
+        
         public static void ChangeRoomHook(On.RoomCamera.orig_ChangeRoom orig, RoomCamera rCam, Room newRoom, int cameraPosition)
         {
+            if (!ShouldScroll(newRoom))
+            {
+                orig(rCam, newRoom, cameraPosition);
+                return;
+            }
             Vector2 camPos = newRoom.cameraPositions[0];
             newRoom.cameraPositions = new Vector2[1];
             newRoom.cameraPositions[0] = camPos;
@@ -30,6 +62,7 @@ namespace CameraScroll
         public static void UpdateHook(On.RoomCamera.orig_Update orig, RoomCamera rCam)
         {
             orig(rCam);
+            if (!ShouldScroll(rCam)) return;
             if (rCam.followAbstractCreature != null && rCam.followAbstractCreature.realizedCreature != null && rCam.followAbstractCreature.realizedCreature.mainBodyChunk != null
              && rCam.game != null && rCam.game.rainWorld != null && rCam.game.rainWorld.options != null)
             {
@@ -39,7 +72,7 @@ namespace CameraScroll
         
         public static void MoveCamera2Hook(On.RoomCamera.orig_MoveCamera2 orig, RoomCamera rCam, string requestedTexture)
         {
-            if (requestedTexture.Split('_').Length > 2)
+            if (ShouldScroll(rCam) && requestedTexture.Split('_').Length > 2)
             {
                 string[] parts = requestedTexture.Split('_');
                 requestedTexture = String.Concat(parts[0], "_", parts[1], ".png");
@@ -51,7 +84,14 @@ namespace CameraScroll
         {
             WWW www = (WWW)typeof(RoomCamera).GetField("www", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).GetValue(rCam);
             Texture2D texture = rCam.game.rainWorld.persistentData.cameraTextures[rCam.cameraNumber, 0];
-            texture.Resize(www.texture.width, www.texture.height, TextureFormat.ARGB32, false);
+            if (ShouldScroll(rCam))
+            {
+                texture.Resize(www.texture.width, www.texture.height, TextureFormat.ARGB32, false);
+            }
+            else
+            {
+                texture.Resize(1400, 800, TextureFormat.ARGB32, false); // default
+            }
             texture.Apply();
             
             FAtlasManager manager = Futile.atlasManager;
@@ -77,6 +117,11 @@ namespace CameraScroll
         
         public static void DrawUpdateHook(On.RoomCamera.orig_DrawUpdate orig, RoomCamera rCam, float timeStacker, float timeSpeed)
         {
+            if (!ShouldScroll(rCam))
+            {
+                orig(rCam, timeStacker, timeSpeed);
+                return;
+            }
             if (rCam.hud != null)
             {
                 rCam.hud.Draw(timeStacker);
@@ -224,14 +269,22 @@ namespace CameraScroll
         
         public static Vector2 CamPosHook(On.RoomCamera.orig_CamPos orig, RoomCamera rCam, int camPos)
         {
+            if (!ShouldScroll(rCam)) return orig(rCam, camPos);
             return orig(rCam, 0);
         }
         
         public static void PreLoadTextureHook(On.RoomCamera.orig_PreLoadTexture orig, RoomCamera rCam, Room room, int camPos)
         {
+            if (!ShouldScroll(rCam))
+            {
+                orig(rCam, room, camPos);
+                return;
+            }
             rCam.quenedTexture = WorldLoader.FindRoomFileDirectory(room.abstractRoom.name, true) + ".png";
             rCam.www = new WWW(rCam.quenedTexture);
             orig(rCam, room, 0);
         }
+        
+        public static Dictionary<string, bool> shouldScrollRooms = new Dictionary<string, bool>();
     }
 }
