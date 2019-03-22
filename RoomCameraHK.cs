@@ -4,6 +4,8 @@ using UnityEngine;
 using System.Reflection;
 using System.Collections.Generic;
 
+// Somehow the ShouldScroll stuff messes up going from 1-screen room to 3-screen room. ???
+
 namespace CameraScroll
 {
     public static class RoomCameraHK
@@ -43,7 +45,29 @@ namespace CameraScroll
                 should = true;
             }
             shouldScrollRooms[name] = should;
+            Debug.LogError("Scroll in " + name + "? " + should);
             return should;
+        }
+        
+        public static bool ShouldScroll(RoomCamera rCam, string room)
+        {
+            AbstractRoom aroom = rCam.game.world.GetAbstractRoom(room);
+            if (aroom == null || aroom.realizedRoom == null) return room.Split('_')[1][0] != 'A';
+            return ShouldScroll(aroom.realizedRoom);
+        }
+        
+        public static string GetRoomName(string url)
+        {
+            string[] parts = url.Split('_');
+            string[] firstPart = parts[0].Split('\\');
+            firstPart = new string[]{firstPart[firstPart.Length - 1]};
+            return firstPart[0] + "_" + parts[1];
+        }
+        
+        public static string GetPng(string url)
+        {
+            string[] parts = url.Split('_');
+            return parts[0] + "_" + parts[1] + ".png";
         }
         
         public static void ChangeRoomHook(On.RoomCamera.orig_ChangeRoom orig, RoomCamera rCam, Room newRoom, int cameraPosition)
@@ -72,10 +96,9 @@ namespace CameraScroll
         
         public static void MoveCamera2Hook(On.RoomCamera.orig_MoveCamera2 orig, RoomCamera rCam, string requestedTexture)
         {
-            if (ShouldScroll(rCam) && requestedTexture.Split('_').Length > 2)
+            if (requestedTexture.Split('_').Length > 2)
             {
-                string[] parts = requestedTexture.Split('_');
-                requestedTexture = String.Concat(parts[0], "_", parts[1], ".png");
+                if (ShouldScroll(rCam, GetRoomName(requestedTexture))) requestedTexture = GetPng(requestedTexture);
             }
             orig(rCam, requestedTexture);
         }
@@ -84,7 +107,7 @@ namespace CameraScroll
         {
             WWW www = (WWW)typeof(RoomCamera).GetField("www", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).GetValue(rCam);
             Texture2D texture = rCam.game.rainWorld.persistentData.cameraTextures[rCam.cameraNumber, 0];
-            if (ShouldScroll(rCam))
+            if (ShouldScroll(rCam, GetRoomName(www.url)))
             {
                 texture.Resize(www.texture.width, www.texture.height, TextureFormat.ARGB32, false);
             }
@@ -275,7 +298,7 @@ namespace CameraScroll
         
         public static void PreLoadTextureHook(On.RoomCamera.orig_PreLoadTexture orig, RoomCamera rCam, Room room, int camPos)
         {
-            if (!ShouldScroll(rCam))
+            if (!ShouldScroll(room))
             {
                 orig(rCam, room, camPos);
                 return;
