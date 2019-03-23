@@ -56,18 +56,24 @@ namespace CameraScroll
             return ShouldScroll(aroom.realizedRoom);
         }
         
+        public static bool IsGate(string url)
+        {
+            string[] path = url.Split('_')[0].Split('\\');
+            return path[path.Length - 1] == "GATE";
+        }
+        
         public static string GetRoomName(string url)
         {
             string[] parts = url.Split('_');
             string[] firstPart = parts[0].Split('\\');
             firstPart = new string[]{firstPart[firstPart.Length - 1]};
-            return firstPart[0] + "_" + parts[1];
+            return firstPart[0] + "_" + parts[1] + (firstPart[0] == "GATE" ? ("_" + parts[2]) : "");
         }
         
         public static string GetPng(string url)
         {
             string[] parts = url.Split('_');
-            return parts[0] + "_" + parts[1] + ".png";
+            return parts[0] + "_" + parts[1] + (IsGate(url) ? "_" + parts[2] : "") + ".png";
         }
         
         public static void ChangeRoomHook(On.RoomCamera.orig_ChangeRoom orig, RoomCamera rCam, Room newRoom, int cameraPosition)
@@ -78,6 +84,15 @@ namespace CameraScroll
                 return;
             }
             Vector2 camPos = newRoom.cameraPositions[0];
+            for (int i = 0; i < newRoom.cameraPositions.Length; i++)
+            {
+                Vector2 newCamPos = newRoom.cameraPositions[i];
+                Vector2 difference = newCamPos - camPos;
+                if (difference.x < 0 && difference.y < 0)
+                {
+                    camPos = newCamPos;
+                }
+            }
             newRoom.cameraPositions = new Vector2[1];
             newRoom.cameraPositions[0] = camPos;
             orig(rCam, newRoom, 0);
