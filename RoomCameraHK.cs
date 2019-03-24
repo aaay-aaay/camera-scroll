@@ -45,7 +45,6 @@ namespace CameraScroll
                 should = true;
             }
             shouldScrollRooms[name] = should;
-            Debug.LogError("Scroll in " + name + "? " + should);
             return should;
         }
         
@@ -105,7 +104,20 @@ namespace CameraScroll
             if (rCam.followAbstractCreature != null && rCam.followAbstractCreature.realizedCreature != null && rCam.followAbstractCreature.realizedCreature.mainBodyChunk != null
              && rCam.game != null && rCam.game.rainWorld != null && rCam.game.rainWorld.options != null)
             {
-                rCam.pos = rCam.followAbstractCreature.realizedCreature.mainBodyChunk.pos - (rCam.game.rainWorld.options.ScreenSize / 2);
+                Creature creature = rCam.followAbstractCreature.realizedCreature;
+                Vector2 pos = creature.mainBodyChunk.pos;
+                if (rCam.game.shortcuts != null)
+                {
+                    foreach (ShortcutHandler.ShortCutVessel vessel in rCam.game.shortcuts.transportVessels)
+                    {
+                        if (vessel.creature == creature)
+                        {
+                            pos = new Vector2(10 + vessel.pos.x * 20, 10 + vessel.pos.y * 20);
+                            break;
+                        }
+                    }
+                }
+                rCam.pos = pos - (rCam.game.rainWorld.options.ScreenSize / 2);
             }
         }
         
