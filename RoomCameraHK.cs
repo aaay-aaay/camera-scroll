@@ -4,8 +4,6 @@ using UnityEngine;
 using System.Reflection;
 using System.Collections.Generic;
 
-// Somehow the ShouldScroll stuff messes up going from 1-screen room to 3-screen room. ???
-
 namespace CameraScroll
 {
     public static class RoomCameraHK
@@ -19,6 +17,7 @@ namespace CameraScroll
             On.RoomCamera.DrawUpdate += DrawUpdateHook;
             On.RoomCamera.CamPos += CamPosHook;
             On.RoomCamera.PreLoadTexture += PreLoadTextureHook;
+            On.RoomCamera.ApplyDepth += ApplyDepthHook;
         }
         
         public static bool ShouldScroll(RoomCamera rCam)
@@ -75,6 +74,25 @@ namespace CameraScroll
             return parts[0] + "_" + parts[1] + (IsGate(url) ? "_" + parts[2] : "") + ".png";
         }
         
+        public static void EnsureRoomInit(Room room)
+        {
+            if (!ShouldScroll(room)) return;
+            if (origCameraPositions.ContainsKey(room.abstractRoom.name)) return;
+            origCameraPositions[room.abstractRoom.name] = room.cameraPositions;
+            float x = float.MaxValue;
+            float y = float.MaxValue;
+            for (int i = 0; i < room.cameraPositions.Length; i++)
+            {
+                Vector2 pos = room.cameraPositions[i];
+                Debug.Log("CHECKING " + pos.x + " , " + pos.y);
+                if (pos.x < x) x = pos.x;
+                if (pos.y < y) y = pos.y;
+            }
+            room.cameraPositions = new Vector2[1];
+            room.cameraPositions[0] = new Vector2(x, y);
+            Debug.Log("ROOM " + room.abstractRoom.name + " AT " + x + " , " + y);
+        }
+        
         public static void ChangeRoomHook(On.RoomCamera.orig_ChangeRoom orig, RoomCamera rCam, Room newRoom, int cameraPosition)
         {
             if (!ShouldScroll(newRoom))
@@ -82,6 +100,7 @@ namespace CameraScroll
                 orig(rCam, newRoom, cameraPosition);
                 return;
             }
+            /*
             Vector2 camPos = newRoom.cameraPositions[0];
             for (int i = 0; i < newRoom.cameraPositions.Length; i++)
             {
@@ -94,6 +113,8 @@ namespace CameraScroll
             }
             newRoom.cameraPositions = new Vector2[1];
             newRoom.cameraPositions[0] = camPos;
+            */
+            EnsureRoomInit(newRoom);
             orig(rCam, newRoom, 0);
         }
         
@@ -335,6 +356,24 @@ namespace CameraScroll
             orig(rCam, room, 0);
         }
         
+        public static Vector2 ApplyDepthHook(On.RoomCamera.orig_ApplyDepth orig, RoomCamera camera, Vector2 ps, float depth)
+        {
+            if (!ShouldScroll(camera) || !origCameraPositions.ContainsKey(camera.room.abstractRoom.name))
+            {
+                return orig(camera, ps, depth);
+            }
+            Vector2 realCameraPosition = new Vector2(0, 0);
+            foreach (Vector2 camPos in origCameraPositions[camera.room.abstractRoom.name])
+            {
+                if (ps.x > camPos.x && ps.y > camPos.y && camPos.x + 1400 > ps.x && camPos.y + 800 > ps.y)
+                {
+                    realCameraPosition = camPos;
+                }
+            }
+            return Custom.ApplyDepthOnVector(ps, realCameraPosition + new Vector2(700f, 533.3334f), depth);
+        }
+        
         public static Dictionary<string, bool> shouldScrollRooms = new Dictionary<string, bool>();
+        public static Dictionary<string, Vector2[]> origCameraPositions = new Dictionary<string, Vector2[]>();
     }
 }

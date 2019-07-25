@@ -13,6 +13,7 @@ namespace CameraScroll
         public override void OnLoad()
         {
             RoomCameraHK.Hook();
+            SmallHK.Hook();
         }
     }
 }
