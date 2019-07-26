@@ -11,6 +11,8 @@ namespace CameraScroll
             On.AboveCloudsView.CloseCloud.DrawSprites += ACVCCDrawSpritesHook;
             On.AboveCloudsView.DistantCloud.DrawSprites += ACVDCDrawSpritesHook;
             On.AboveCloudsView.FlyingCloud.DrawSprites += ACVFCDrawSpritesHook;
+            On.SuperStructureProjector.SingleGlyph.DrawSprites += SSPSGDrawSpritesHook;
+            On.SuperStructureProjector.GlyphMatrix.DrawSprites += SSPGMDrawSpritesHook;
         }
         
         public static float GWPGhostModeHook(On.GhostWorldPresence.orig_GhostMode orig, GhostWorldPresence presence, Room room, int camPos)
@@ -66,6 +68,36 @@ namespace CameraScroll
             Vector2[] cameraPositions = room.cameraPositions;
             room.cameraPositions = RoomCameraHK.origCameraPositions[room.abstractRoom.name];
             orig(cloud, sLeaser, rCam, timeStacker, camPos);
+            room.cameraPositions = cameraPositions;
+        }
+        
+        public static void SSPSGDrawSpritesHook(On.SuperStructureProjector.SingleGlyph.orig_DrawSprites orig, SuperStructureProjector.SingleGlyph glyph, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
+        {
+            Room room = rCam.room;
+            RoomCameraHK.EnsureRoomInit(room);
+            if (!RoomCameraHK.ShouldScroll(room))
+            {
+                orig(glyph, sLeaser, rCam, timeStacker, camPos);
+                return;
+            }
+            Vector2[] cameraPositions = room.cameraPositions;
+            room.cameraPositions = RoomCameraHK.origCameraPositions[room.abstractRoom.name];
+            orig(glyph, sLeaser, rCam, timeStacker, camPos);
+            room.cameraPositions = cameraPositions;
+        }
+        
+        public static void SSPGMDrawSpritesHook(On.SuperStructureProjector.GlyphMatrix.orig_DrawSprites orig, SuperStructureProjector.GlyphMatrix matrix, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
+        {
+            Room room = rCam.room;
+            RoomCameraHK.EnsureRoomInit(room);
+            if (!RoomCameraHK.ShouldScroll(room))
+            {
+                orig(matrix, sLeaser, rCam, timeStacker, camPos);
+                return;
+            }
+            Vector2[] cameraPositions = room.cameraPositions;
+            room.cameraPositions = RoomCameraHK.origCameraPositions[room.abstractRoom.name];
+            orig(matrix, sLeaser, rCam, timeStacker, camPos);
             room.cameraPositions = cameraPositions;
         }
     }
