@@ -10,6 +10,7 @@ namespace CameraScroll
     {
         public static void Hook()
         {
+            On.Room.LoadFromDataString += LoadFromDataStringHook;
             On.RoomCamera.ChangeRoom += ChangeRoomHook;
             On.RoomCamera.Update += UpdateHook;
             On.RoomCamera.MoveCamera2 += MoveCamera2Hook;
@@ -18,6 +19,12 @@ namespace CameraScroll
             On.RoomCamera.CamPos += CamPosHook;
             On.RoomCamera.PreLoadTexture += PreLoadTextureHook;
             On.RoomCamera.ApplyDepth += ApplyDepthHook;
+        }
+        
+        public static void LoadFromDataStringHook(On.Room.orig_LoadFromDataString orig, Room room, string[] lines)
+        {
+            origCameraPositions.Clear();
+            orig(room, lines);
         }
         
         public static bool ShouldScroll(RoomCamera rCam)
@@ -77,20 +84,24 @@ namespace CameraScroll
         public static void EnsureRoomInit(Room room)
         {
             if (!ShouldScroll(room)) return;
-            if (origCameraPositions.ContainsKey(room.abstractRoom.name)) return;
+            if (origCameraPositions.ContainsKey(room.abstractRoom.name))
+            {
+                Debug.Log("ROOM " + room.abstractRoom.name + " ALREADY AT " + room.cameraPositions[0].x + "," + room.cameraPositions[0].y);
+                return;
+            }
             origCameraPositions[room.abstractRoom.name] = room.cameraPositions;
             float x = float.MaxValue;
             float y = float.MaxValue;
             for (int i = 0; i < room.cameraPositions.Length; i++)
             {
                 Vector2 pos = room.cameraPositions[i];
-                Debug.Log("CHECKING " + pos.x + " , " + pos.y);
+                Debug.Log("CHECKING " + pos.x + "," + pos.y);
                 if (pos.x < x) x = pos.x;
                 if (pos.y < y) y = pos.y;
             }
             room.cameraPositions = new Vector2[1];
             room.cameraPositions[0] = new Vector2(x, y);
-            Debug.Log("ROOM " + room.abstractRoom.name + " AT " + x + " , " + y);
+            Debug.Log("ROOM " + room.abstractRoom.name + " AT " + x + "," + y);
         }
         
         public static void ChangeRoomHook(On.RoomCamera.orig_ChangeRoom orig, RoomCamera rCam, Room newRoom, int cameraPosition)
@@ -100,20 +111,6 @@ namespace CameraScroll
                 orig(rCam, newRoom, cameraPosition);
                 return;
             }
-            /*
-            Vector2 camPos = newRoom.cameraPositions[0];
-            for (int i = 0; i < newRoom.cameraPositions.Length; i++)
-            {
-                Vector2 newCamPos = newRoom.cameraPositions[i];
-                Vector2 difference = newCamPos - camPos;
-                if (difference.x < 0 && difference.y < 0)
-                {
-                    camPos = newCamPos;
-                }
-            }
-            newRoom.cameraPositions = new Vector2[1];
-            newRoom.cameraPositions[0] = camPos;
-            */
             EnsureRoomInit(newRoom);
             orig(rCam, newRoom, 0);
         }
@@ -356,12 +353,8 @@ namespace CameraScroll
             orig(rCam, room, 0);
         }
         
-        public static Vector2 ApplyDepthHook(On.RoomCamera.orig_ApplyDepth orig, RoomCamera camera, Vector2 ps, float depth)
+        public static Vector2 DetermineOriginalCamPos(RoomCamera camera, Vector2 ps)
         {
-            if (!ShouldScroll(camera) || !origCameraPositions.ContainsKey(camera.room.abstractRoom.name))
-            {
-                return orig(camera, ps, depth);
-            }
             Vector2 realCameraPosition = new Vector2(0, 0);
             foreach (Vector2 camPos in origCameraPositions[camera.room.abstractRoom.name])
             {
@@ -370,7 +363,26 @@ namespace CameraScroll
                     realCameraPosition = camPos;
                 }
             }
-            return Custom.ApplyDepthOnVector(ps, realCameraPosition + new Vector2(700f, 533.3334f), depth);
+            return realCameraPosition;
+        }
+        
+        public static Vector2 ApplyDepthHook(On.RoomCamera.orig_ApplyDepth orig, RoomCamera camera, Vector2 ps, float depth)
+        {
+            if (!ShouldScroll(camera) || !origCameraPositions.ContainsKey(camera.room.abstractRoom.name))
+            {
+                return orig(camera, ps, depth);
+            }
+            Vector2 realCameraPosition = new Vector2(0, 0);
+            /*
+            foreach (Vector2 camPos in origCameraPositions[camera.room.abstractRoom.name])
+            {
+                if (ps.x > camPos.x && ps.y > camPos.y && camPos.x + 1400 > ps.x && camPos.y + 800 > ps.y)
+                {
+                    realCameraPosition = camPos;
+                }
+            }
+            */
+            return Custom.ApplyDepthOnVector(ps, /*realCameraPosition*/ DetermineOriginalCamPos(camera, ps) + new Vector2(700f, 533.3334f), depth);
         }
         
         public static Dictionary<string, bool> shouldScrollRooms = new Dictionary<string, bool>();
