@@ -13,6 +13,7 @@ namespace CameraScroll
             On.AboveCloudsView.FlyingCloud.DrawSprites += ACVFCDrawSpritesHook;
             On.SuperStructureProjector.SingleGlyph.DrawSprites += SSPSGDrawSpritesHook;
             On.SuperStructureProjector.GlyphMatrix.DrawSprites += SSPGMDrawSpritesHook;
+            On.Room.ViewedByAnyCamera += ViewedByAnyCameraHook;
         }
         
         public static float GWPGhostModeHook(On.GhostWorldPresence.orig_GhostMode orig, GhostWorldPresence presence, Room room, int camPos)
@@ -99,6 +100,18 @@ namespace CameraScroll
             room.cameraPositions = RoomCameraHK.origCameraPositions[room.abstractRoom.name];
             orig(matrix, sLeaser, rCam, timeStacker, camPos);
             room.cameraPositions = cameraPositions;
+        }
+        
+        public static bool ViewedByAnyCameraHook(On.Room.orig_ViewedByAnyCamera orig, Room self, Vector2 pos, float margin)
+        {
+            RoomCameraHK.EnsureRoomInit(self);
+            if (!RoomCameraHK.ShouldScroll(self))
+                return orig(self, pos, margin);
+            Vector2[] cameraPositions = self.cameraPositions;
+            self.cameraPositions = RoomCameraHK.origCameraPositions[self.abstractRoom.name];
+            bool res = orig(self, pos, margin);
+            self.cameraPositions = cameraPositions;
+            return res;
         }
     }
 }
